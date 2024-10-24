@@ -1,0 +1,623 @@
+---
+title: "STAT_REA_1.2"
+author: "Afaf ALOUI & Mohamed EL-BADRI"
+date: "2024-08-13"
+output:
+  pdf_document: 
+    fig_width: 10
+    fig_height: 7
+  html_document: default
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(magrittr)
+library(dplyr)
+library(readODS)
+library(pracma)
+library(sf)
+library(ggplot2)
+```
+
+```{r}
+setwd("~/SI")
+set.seed(123)
+```
+
+```{r}
+set.seed(123)
+setwd("~/SI")
+DATA_1.1=read_ods("SPEI_12_REA.ods",col_names = TRUE,row_names = TRUE,as_tibble = FALSE)
+# DATA %<>% na.omit()
+# rownames(DATA_1.1)=as.character(DATA_1.1$TIME)
+# DATA_1.1 %<>% select(-TIME) 
+# DATA$Dakhla <- as.numeric(DATA$Dakhla)
+print(head(DATA_1.1))
+```
+
+```{r}
+minimum = round(apply(DATA_1.1, 2, min), 3)
+moyenne = round(apply(DATA_1.1, 2, mean), 3)
+maximum = round(apply(DATA_1.1, 2, max), 3)
+variance = round(apply(DATA_1.1, 2, var), 3)
+ecarttype = round(apply(DATA_1.1, 2, sd), 3)
+rbind(minimum, moyenne, maximum, variance, ecarttype)
+```
+
+
+```{r}
+set.seed(123)
+MD_1.1 = t(DATA_1.1)
+MD_1.1[is.infinite(MD_1.1)]=NA
+MD_1.1 %<>% na.omit()
+colnames(MD_1.1)=as.character(seq.Date(from=as.Date("1950-12-01"),to=as.Date("2024-04-01"),"months"))
+nombre_clusters <- 6
+kmeans_resultats_1.1 <- kmeans(MD_1.1, centers = nombre_clusters, algorithm = "MacQueen")
+```
+
+```{r}
+set.seed(123)
+cat("La classe de chaque individu est:\n")
+print(kmeans_resultats_1.1$cluster)
+
+cat("================================================================================== \n")
+
+cat("La somme totale des distances au carré par rapport au centre de gravité: Total Sum of Squares TSS (~ inertie totale) = WSS + BSS\n")
+print(kmeans_resultats_1.1$totss)
+
+cat("==================================================================================\n")
+
+cat("Pour chaque classe : la somme des distances au carré par rapport au centre de gravité de la classe: Sum of Squares for each cluster\n")
+print(kmeans_resultats_1.1$withinss)
+
+cat("==================================================================================\n")
+
+cat("La taille de chaque classe (i.e. Nombre d'individus par classe)")
+print(kmeans_resultats_1.1$size)
+
+cat("==================================================================================\n")
+
+for (i in c(1:3)) {
+  cat("Les villes appartenant à la ", i, "ème classe sont: \n", kmeans_resultats_1.1$cluster[kmeans_resultats_1.1$cluster == i] %>% names(), "\n\n")
+}
+
+cat("==================================================================================\n")
+
+cat("\n\n Donc, on peut visualiser les zones arides et sèches au Maroc dans la carte ci-dessous.")
+
+
+
+```
+
+
+```{r}
+set.seed(123)
+# # Example coordinates for Moroccan cities (latitude and longitude)
+cities <- data.frame(
+  city = c("Casablanca", "Rabat", "Marrakech", "Tangier", "Agadir", "Fes", 
+           "Oujda", "Meknes", "Laayoune", "Dakhla", "Nador", "Tetouan", 
+           "Essaouira", "Al Hoceima", "Kenitra", "Beni Mellal", "Khouribga", 
+           "Safi", "El Jadida", "Taza", "Ifrane", "Ouarzazate", "Chefchaouen", 
+           "Errachidia", "Mohammedia", "Settat", "Sidi Kacem", "Guelmim", 
+           "Taroudant"),
+  lat = c(33.5731, 34.0209, 31.6295, 35.7595, 30.4278, 34.0181, 34.6823, 33.8965, 
+          27.1253, 23.6847, 35.1688, 35.5785, 31.5085, 35.2471, 34.2610, 32.3397, 
+          32.8805, 32.2994, 33.2311, 34.2097, 33.5333, 30.9189, 35.1715, 31.9314, 
+          33.6841, 33.0011, 34.2247, 28.9880, 30.4708),
+  lon = c(-7.5898, -6.8417, -7.9811, -5.8340, -9.5981, -4.9998, -1.9006, -5.5473, 
+          -13.1625, -15.9579, -2.9335, -5.3684, -9.7595, -3.9315, -6.5708, -6.3498, 
+          -6.9066, -9.2372, -8.5007, -3.9986, -5.1167, -6.8931, -5.2632, -4.4243, 
+          -7.3827, -7.6166, -5.7074, -10.0572, -8.8769)
+)
+cities_1.1=cities %>% filter(city %in% names(kmeans_resultats_1.1$cluster))
+class_labels <- kmeans_resultats_1.1$cluster
+cities_1.1$class <- factor(class_labels)
+# Convert to sf object
+cities_sf_1.1 <- st_as_sf(cities_1.1, coords = c("lon", "lat"), crs = 4326)
+
+# Get the shapefile for Morocco
+morocco_shapefile <- st_read("~/SI/SHAPEFILE/comune.shp")
+morocco_shapefile=morocco_shapefile %>% st_make_valid() %>%  st_union() %>% st_make_valid()
+
+# Plot the map
+# ggplot() +
+#   geom_sf(data = morocco_shapefile, fill = "white", color = "black") +
+#   geom_sf(data = cities_sf_1.1, aes(color = factor(class)), size = 3) +
+#   scale_color_manual( labels = paste0("classe",c(1:6))) +
+#   labs(title = "Classification of Moroccan cities ",
+#        subtitle = "Based on K-means Clustering SPEI 12",
+#        color = "Zone") +
+#   theme_minimal() +
+#   theme(legend.position = "bottom")
+
+# Plot the map with automatic color assignment
+ggplot() +
+  geom_sf(data = morocco_shapefile, fill = "white", color = "black") +
+  geom_sf(data = cities_sf_1.1, aes(color = factor(class)), size = 3) +
+  labs(title = "Classification of Moroccan cities",
+       subtitle = "Based on K-means Clustering SPEI 12",
+       color = "Zone") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+
+
+```{r}
+E1_1.1 = round(kmeans_resultats_1.1$centers[1,], 3) # Étalon 1
+E2_1.1 = round(kmeans_resultats_1.1$centers[2,], 3) # Étalon 2
+DF_1.1 = data.frame(cbind(E1_1.1, E2_1.1))
+head(DF_1.1)
+```
+
+```{r}
+DF_combined <- data.frame(round(kmeans_resultats_1.1$centers[1, ], 3))
+colnames(DF_combined) <- paste0("E", 1, "_1.1")
+for (i in c(2:nombre_clusters)) {
+  assign(paste0("E",i,"_1.1"),round(kmeans_resultats_1.1$centers[i,], 3))
+  x=get(paste0("E",i,"_1.1"))
+  temp_df <- data.frame(x)
+  colnames(temp_df) <- paste0("E", i, "_1.1") 
+  
+  # Append the temporary data frame to the combined data frame
+  DF_combined <- cbind(DF_combined, temp_df)
+  # DF_combined %<>% t()
+}
+DF_combined %>% head()
+```
+
+
+
+```{r}
+etalon_name=array()
+for (i in c(1:nombre_clusters)) {
+  
+  # Define the function dynamically and assign it to a named list element
+  assign(paste0("f_1.", i), function(x) sum((x - get(paste0("E", i, "_1.1")))^2))
+  
+  # Use apply to find the minimum and get the corresponding name (ETALON)
+  etalon_name[i] <- names(which.min(apply(MD_1.1, 1, get(paste0("f_1.", i)))))
+  
+  # Assign the result to a dynamic variable (ETALON_i.1)
+  assign(paste0("ETALON_", i, "_1.1"), etalon_name[i])
+  
+  # Print the result using cat
+  cat("L'étalon de la", i, "eme classe est :", etalon_name[i], "\n")
+}
+```
+
+```{r}
+# Load required libraries
+# library(tidyverse)
+library(gridExtra)
+
+# Initialize a list to store the plots
+plot_list <- list()
+
+DF_1.1=DF_combined
+DATE = seq.Date(from = as.Date("1950-12-01"), length.out = length(E1_1.1), by = "month")
+DF_1.1$DATE <- DATE
+# Loop to create and store each plot in the list
+for (i in 1:nombre_clusters) {
+  # Dynamically get the column name and ETALON
+  column_name <- paste0("E", i, "_1.1")
+  # etalon_name <- get(paste0("ETALON_", i, "_1.1"))
+
+  # Create the plot for the ith cluster
+  p <- DF_1.1 %>%
+    ggplot(mapping = aes(x = DATE, y = !!sym(column_name))) +
+    geom_col(mapping = aes(fill = as.factor(sign(!!sym(column_name))))) +
+    labs(x = "TIME", y = "SPEI.12") +
+    scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "15 years") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+    ggtitle(paste("SPEI  12 classe", i, ":", etalon_name[i])) +
+    scale_fill_manual(values = c("-1" = "red", "1" = "darkblue"), name = "Sign")
+  
+  # Store the plot in the list
+  plot_list[[i]] <- p
+}
+
+# Arrange all the plots in a single figure
+grid.arrange(grobs = plot_list, ncol = 4)
+
+```
+
+
+```{r}
+MD_1.2 = t(MD_1.1)
+MD_1.2[is.infinite(MD_1.2)]=NA
+MD_1.2 %<>% na.omit()
+# rownames(MD_1.2)=as.character(seq.Date(from=as.Date("1950-12-01"),to=as.Date("2024-04-01"),"months"))
+nombre_clusters <- 2
+kmeans_resultats_1.2 <- kmeans(MD_1.2, centers = nombre_clusters, algorithm = "MacQueen")
+```
+
+```{r}
+cat("La classe de chaque individu est:\n")
+print(kmeans_resultats_1.2$cluster)
+
+cat("================================================================================== \n")
+
+cat("La somme totale des distances au carré par rapport au centre de gravité: Total Sum of Squares TSS (~ inertie totale) = WSS + BSS\n")
+print(kmeans_resultats_1.2$totss)
+
+cat("==================================================================================\n")
+
+cat("Pour chaque classe : la somme des distances au carré par rapport au centre de gravité de la classe: Sum of Squares for each cluster\n")
+print(kmeans_resultats_1.2$withinss)
+
+cat("==================================================================================\n")
+
+cat("La taille de chaque classe (i.e. Nombre d'individus par classe)")
+print(kmeans_resultats_1.2$size)
+
+cat("==================================================================================\n")
+
+for (i in c(1:2)) {
+  cat("Les périodes appartenant à la ", i, "ème classe sont: \n", kmeans_resultats_1.2$cluster[kmeans_resultats_1.2$cluster == i] %>% names(), "\n\n")
+}
+
+cat("==================================================================================\n")
+
+cat("\n\n Donc, on peut visualiser les zones arides et sèches au Maroc dans la carte ci-dessous.")
+
+```
+
+```{r}
+for ( i in (1:nombre_clusters)) {
+  TEXT=length(kmeans_resultats_1.2$cluster[kmeans_resultats_1.2$cluster==i])/length(kmeans_resultats_1.2$cluster)
+  cat("le pourcentage de la classe ",i," est :",TEXT,"\n")
+}
+```
+
+
+```{r}
+E1_1.2 = round(kmeans_resultats_1.2$centers[1,], 3) # Étalon 1
+E2_1.2 = round(kmeans_resultats_1.2$centers[2,], 3) # Étalon 2
+DF_1.2 = data.frame(cbind(E1_1.2, E2_1.2))
+head(DF_1.2)
+```
+
+```{r}
+DF_combined <- data.frame(round(kmeans_resultats_1.2$centers[1, ], 3))
+colnames(DF_combined) <- paste0("E", 1, "_1.2")
+for (i in c(2:nombre_clusters)) {
+  assign(paste0("E",i,"_1.2"),round(kmeans_resultats_1.2$centers[i,], 3))
+  x=get(paste0("E",i,"_1.2"))
+  temp_df <- data.frame(x)
+  colnames(temp_df) <- paste0("E", i, "_1.2") 
+  
+  # Append the temporary data frame to the combined data frame
+  DF_combined <- cbind(DF_combined, temp_df)
+  # DF_combined %<>% t()
+}
+DF_combined %>% head()
+```
+
+
+
+```{r}
+for (i in c(1:nombre_clusters)) {
+  
+  # Define the function dynamically and assign it to a named list element
+  assign(paste0("f_2.", i), function(x) sum((x - get(paste0("E", i, "_1.2")))^2))
+  
+  # Use apply to find the minimum and get the corresponding name (ETALON)
+  etalon_name[i] <- names(which.min(apply(MD_1.2, 1, get(paste0("f_2.", i)))))
+  
+  # Assign the result to a dynamic variable (ETALON_i.1)
+  assign(paste0("ETALON_", i, "_1.2"), etalon_name[i])
+  
+  # Print the result using cat
+  cat("L'étalon de la", i, "eme classe est :", etalon_name[i], "\n")
+}
+```
+
+
+
+
+
+
+#=====================================================SPI==================================================================================================================================
+
+
+
+```{r}
+setwd("~/SI")
+DATA_2.1=read_ods("SPI_12_REA.ods",col_names = TRUE,row_names = TRUE,as_tibble = FALSE)
+# DATA %<>% na.omit()
+# rownames(DATA_2.1)=as.character(DATA_2.1$TIME)
+# DATA_2.1 %<>% select(-TIME) 
+# DATA$Dakhla <- as.numeric(DATA$Dakhla)
+print(head(DATA_2.1))
+```
+
+```{r}
+minimum = round(apply(DATA_2.1, 2, min), 3)
+moyenne = round(apply(DATA_2.1, 2, mean), 3)
+maximum = round(apply(DATA_2.1, 2, max), 3)
+variance = round(apply(DATA_2.1, 2, var), 3)
+ecarttype = round(apply(DATA_2.1, 2, sd), 3)
+rbind(minimum, moyenne, maximum, variance, ecarttype)
+```
+
+
+```{r}
+set.seed(123)
+MD_2.1 = t(DATA_2.1)
+MD_2.1[is.infinite(MD_2.1)]=NA
+MD_2.1 %<>% na.omit()
+colnames(MD_2.1)=seq.Date(from=as.Date("1950-12-01"),to=as.Date("2024-04-01"),"months")
+nombre_clusters <- 9
+kmeans_resultats_2 <- kmeans(MD_2.1, centers = nombre_clusters, algorithm = "MacQueen")
+
+```
+
+```{r}
+cat("La classe de chaque individu est:\n")
+print(kmeans_resultats_2$cluster)
+
+cat("================================================================================== \n")
+
+cat("La somme totale des distances au carré par rapport au centre de gravité: Total Sum of Squares TSS (~ inertie totale) = WSS + BSS\n")
+print(kmeans_resultats_2$totss)
+
+cat("==================================================================================\n")
+
+cat("Pour chaque classe : la somme des distances au carré par rapport au centre de gravité de la classe: Sum of Squares for each cluster\n")
+print(kmeans_resultats_2$withinss)
+
+cat("==================================================================================\n")
+
+cat("La taille de chaque classe (i.e. Nombre d'individus par classe)")
+print(kmeans_resultats_2$size)
+
+cat("==================================================================================\n")
+
+for (i in c(1:2)) {
+  cat("Les villes appartenant à la ", i, "ème classe sont: \n", kmeans_resultats_2$cluster[kmeans_resultats_2$cluster == i] %>% names(), "\n\n")
+}
+
+cat("==================================================================================\n")
+
+cat("\n\n Donc, on peut visualiser les zones arides et sèches au Maroc dans la carte ci-dessous.")
+```
+
+
+```{r}
+
+set.seed(123)
+# # Example coordinates for Moroccan cities (latitude and longitude)
+cities_1.1=cities %>% filter(city %in% names(kmeans_resultats_2$cluster))
+class_labels <- kmeans_resultats_2$cluster
+cities_1.1$class <- factor(class_labels)
+# Convert to sf object
+cities_sf_1.1 <- st_as_sf(cities_1.1, coords = c("lon", "lat"), crs = 4326)
+
+# Get the shapefile for Morocco
+morocco_shapefile <- st_read("~/SI/SHAPEFILE/comune.shp")
+morocco_shapefile=morocco_shapefile %>% st_make_valid() %>%  st_union() %>% st_make_valid()
+
+ggplot() +
+  geom_sf(data = morocco_shapefile, fill = "white", color = "black") +
+  geom_sf(data = cities_sf_1.1, aes(color = factor(class)), size = 3) +
+  labs(title = "Classification of Moroccan cities",
+       subtitle = "Based on K-means Clustering SPI 12",
+       color = "Zone") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+
+
+
+```{r}
+E1_2.1 = round(kmeans_resultats_2$centers[1,], 3) # Étalon 1
+E2_2.1 = round(kmeans_resultats_2$centers[2,], 3) # Étalon 2
+DF_2.1 = data.frame(cbind(E1_2.1, E2_2.1))
+head(DF_2.1)
+```
+
+```{r}
+f_2.1=function(x) sum((x-E1_2.1)^2)
+f_2.2=function(x) sum((x-E2_2.1)^2)
+ETALON_2.1=which.min(apply(MD_2.1,1,f_2.1)) %>% names()
+ETALON_2.2=which.min(apply(MD_2.1,1,f_2.2)) %>% names()
+cat("l'étalon de la 1 ere classe est : ",which.min(apply(MD_2.1,1,f_2.1)) %>% names(),"\n")
+cat("l'étalon de la 1 ere classe est : ",which.min(apply(MD_2.1,1,f_2.2)) %>% names())
+```
+
+
+
+```{r}
+DF_combined <- data.frame(round(kmeans_resultats_2$centers[1, ], 3))
+colnames(DF_combined) <- paste0("E", 1, "_2.1")
+for (i in c(2:nombre_clusters)) {
+  assign(paste0("E",i,"_2.1"),round(kmeans_resultats_2$centers[i,], 3))
+  x=get(paste0("E",i,"_2.1"))
+  temp_df <- data.frame(x)
+  colnames(temp_df) <- paste0("E", i, "_2.1") 
+  
+  # Append the temporary data frame to the combined data frame
+  DF_combined <- cbind(DF_combined, temp_df)
+  # DF_combined %<>% t()
+}
+DF_combined %>% head()
+```
+
+
+
+```{r}
+for (i in c(1:nombre_clusters)) {
+  
+  # Define the function dynamically and assign it to a named list element
+  assign(paste0("f_2.", i), function(x) sum((x - get(paste0("E", i, "_2.1")))^2))
+  
+  # Use apply to find the minimum and get the corresponding name (ETALON)
+  etalon_name[i] <- names(which.min(apply(MD_2.1, 1, get(paste0("f_2.", i)))))
+  
+  # Assign the result to a dynamic variable (ETALON_i.1)
+  # assign(paste0("ETALON_", i, "_1.2"), etalon_name[i])
+  
+  # Print the result using cat
+  cat("L'étalon de la", i, "eme classe est :", etalon_name[i], "\n")
+}
+```
+
+```{r}
+DATE = seq.Date(from = as.Date("1950-12-01"), length.out = length(E1_2.1), by = "month")
+DF_2.1$DATE <- DATE
+PLOT_BAR_2.1 <- DF_2.1 %>%
+  ggplot(mapping = aes(x = DATE, y = E1_2.1)) +
+  geom_col(mapping = aes(fill = as.factor(sign(E1_2.1)))) +
+  labs(x = "TIME", y = "SPI.12") +
+  scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "2 years") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  ggtitle("SPEI SCALE 12 classe 1",ETALON_2.1) +
+  scale_fill_manual(values = c("-1" = "red", "1" = "darkblue"), name = "Sign")
+print(PLOT_BAR_2.1)
+```
+
+
+```{r}
+DF_2.1$DATE <- DATE
+PLOT_BAR_2.2 <- DF_2.1 %>%
+  ggplot(mapping = aes(x = DATE, y = E2_2.1)) +
+  geom_col(mapping = aes(fill = as.factor(sign(E2_2.1)))) +
+  labs(x = "TIME", y = "SPI.12") +
+  scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "2 years") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  ggtitle("SPI SCALE 12 classe 2",ETALON_2.2) +
+  scale_fill_manual(values = c("-1" = "red", "1" = "darkblue"), name = "Sign")
+print(PLOT_BAR_2.2)
+
+```
+
+
+```{r}
+
+DF_2.1=DF_combined
+library(gridExtra)
+
+# Initialize a list to store the plots
+plot_list <- list()
+
+DATE = seq.Date(from = as.Date("1950-12-01"), length.out = length(E1_1.1), by = "month")
+DF_2.1$DATE <- DATE
+# Loop to create and store each plot in the list
+for (i in 1:nombre_clusters) {
+  # Dynamically get the column name and ETALON
+  column_name <- paste0("E", i, "_2.1")
+  # etalon_name <- get(paste0("ETALON_", i, "_1.1"))
+
+  # Create the plot for the ith cluster
+  p <- DF_2.1 %>%
+    ggplot(mapping = aes(x = DATE, y = !!sym(column_name))) +
+    geom_col(mapping = aes(fill = as.factor(sign(!!sym(column_name))))) +
+
+    labs(x = "TIME", y = "SPEI.12") +
+    scale_x_date(date_labels = "%Y-%m-%d", date_breaks = "5 years") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+    ggtitle(paste("SPI  12 classe", i, ":", etalon_name[i])) +
+    scale_fill_manual(values = c("-1" = "red", "1" = "darkblue"), name = "Sign")
+  
+  # Store the plot in the list
+  plot_list[[i]] <- p
+}
+
+# Arrange all the plots in a single figure
+grid.arrange(grobs = plot_list, ncol = 3)
+
+```
+
+
+```{r}
+MD_2.2 = as.matrix(DATA_2.1)
+MD_2.2[is.infinite(MD_2.2)]=NA
+MD_2.2 %<>% na.omit()
+# rownames(MD_2.2)=as.character(seq.Date(from=as.Date("1950-12-01"),to=as.Date("2024-04-01"),"months"))
+nombre_clusters <- 2
+kmeans_resultats_2.2 <- kmeans(MD_2.2, centers = nombre_clusters, algorithm = "MacQueen")
+```
+
+```{r}
+cat("La classe de chaque individu est:\n")
+print(kmeans_resultats_2.2$cluster)
+
+cat("================================================================================== \n")
+
+cat("La somme totale des distances au carré par rapport au centre de gravité: Total Sum of Squares TSS (~ inertie totale) = WSS + BSS\n")
+print(kmeans_resultats_2.2$totss)
+
+cat("==================================================================================\n")
+
+cat("Pour chaque classe : la somme des distances au carré par rapport au centre de gravité de la classe: Sum of Squares for each cluster\n")
+print(kmeans_resultats_2.2$withinss)
+
+cat("==================================================================================\n")
+
+cat("La taille de chaque classe (i.e. Nombre d'individus par classe)")
+print(kmeans_resultats_2.2$size)
+
+cat("==================================================================================\n")
+
+for (i in c(1:2)) {
+  cat("Les périodes appartenant à la ", i, "ème classe sont: \n", kmeans_resultats_2.2$cluster[kmeans_resultats_2.2$cluster == i] %>% names(), "\n\n")
+}
+
+cat("==================================================================================\n")
+
+cat("\n\n Donc, on peut visualiser les zones arides et sèches au Maroc dans la carte ci-dessous.")
+
+```
+
+```{r}
+E1_2.2 = round(kmeans_resultats_2.2$centers[1,], 3) # Étalon 1
+E2_2.2 = round(kmeans_resultats_2.2$centers[2,], 3) # Étalon 2
+DF_2.2 = data.frame(cbind(E1_2.2, E2_2.2))
+head(DF_2.2)
+```
+
+
+
+```{r}
+DF_combined <- data.frame(round(kmeans_resultats_2.2$centers[1, ], 3))
+colnames(DF_combined) <- paste0("E", 1, "_1.2")
+for (i in c(2:nombre_clusters)) {
+  assign(paste0("E",i,"_1.2"),round(kmeans_resultats_2.2$centers[i,], 3))
+  x=get(paste0("E",i,"_1.2"))
+  temp_df <- data.frame(x)
+  colnames(temp_df) <- paste0("E", i, "_1.2") 
+  
+  # Append the temporary data frame to the combined data frame
+  DF_combined <- cbind(DF_combined, temp_df)
+  # DF_combined %<>% t()
+}
+DF_combined %>% head()
+```
+
+
+
+```{r}
+for (i in c(1:nombre_clusters)) {
+  
+  # Define the function dynamically and assign it to a named list element
+  assign(paste0("f_2.", i), function(x) sum((x - get(paste0("E", i, "_1.2")))^2))
+  
+  # Use apply to find the minimum and get the corresponding name (ETALON)
+  etalon_name[i] <- names(which.min(apply(MD_2.2, 1, get(paste0("f_2.", i)))))
+  
+  # Assign the result to a dynamic variable (ETALON_i.1)
+  assign(paste0("ETALON_", i, "_1.2"), etalon_name[i])
+  
+  # Print the result using cat
+  cat("L'étalon de la", i, "eme classe est :", etalon_name[i], "\n")
+}
+```
+
+

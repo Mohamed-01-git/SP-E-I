@@ -1,0 +1,106 @@
+---
+title: "SPI"
+author: "Mohamed && Afaf"
+date: "2024-06-12"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(magrittr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(zoo)
+library(readODS)
+```
+
+```{r}
+setwd("/home/mohamed/EHTP/STAGE D'INGENIEUR") # set the working directory
+rm(list=ls()) #remove all the variables 
+```
+
+```{r}
+DATA=read.table("sale.cor",header = TRUE) # read the DATA 
+DATA %>% head()
+```
+
+```{r}
+DATA %>% summary() # the summary of the DATA.
+```
+
+
+```{r}
+  # This part is very important because it allows us to deal with DATA that does not begin with January
+  # the idea aims to add columns with NA from january to the real month of the time serie .
+  # after this step we continue the same process.
+
+MY_DATA=DATA
+if(MY_DATA$mois[1]==1) TRUE else {
+  j=MY_DATA$mois[1]
+  n=ncol(MY_DATA)
+  M=matrix(rep(NA,n),nrow =(j-1),ncol = n)
+  colnames(M)=colnames(MY_DATA)
+  MY_DATA=rbind(M,MY_DATA)
+}
+#same idea to deal with series that not finish with december.
+if(MY_DATA$mois[nrow(MY_DATA)]==12) TRUE else {
+  j=MY_DATA$mois[nrow(MY_DATA)]
+  n=ncol(MY_DATA)
+  M=matrix(rep(NA,n),nrow =(12-j),ncol = n)
+  colnames(M)=colnames(MY_DATA)
+  MY_DATA=rbind(MY_DATA,M)
+}
+
+```
+
+```{r}
+# This function calculates the Standardized Precipitation Index (SPI) 
+# for each time period within a given precipitation time series.
+SPI=function(i) {
+DATA$RR= rollapply(DATA$rr_sale, width = i, FUN = sum, align = "right", fill = NA) 
+Pm=rep(NA,12)
+Sm=rep(NA,12)
+for ( i in c(1:12)){
+  Pm[i]=DATA %>% filter(mois==i) %>% select(RR) %>% apply(2,mean,na.rm=TRUE)
+  Sm[i]=DATA %>% filter(mois==i) %>% select(RR) %>% apply(2,sd,na.rm=TRUE)
+}
+SPI=(DATA$RR-rep(Pm,54))/rep(Sm,54)
+SPI=SPI %>% unlist()
+return(round(SPI,2))
+}
+```
+
+
+```{r}
+#the final result 
+RESULT=DATA %>% select(YEAR=annee,MONTH=mois,RR=rr_sale) %>% mutate(SPI_1=SPI(1),SPI_3=SPI(3),SPI_6=SPI(6),SPI_9=SPI(9),SPI_12=SPI(12))
+```
+
+
+```{r}
+#the file in ODS and CSV forme 
+write_ods(RESULT,path  = "RESULT.ods", sheet = "SPI_1_3")
+write.table(RESULT, file = "RESULT.csv", row.names = TRUE)
+```
+
+```{r}
+print(RESULT)
+```
+
+# NB, donc il nous reste juste d'ajuster notre serie de precipitations avec une loi probabiliste (gamma, log-normale, gumbel ...) pour faire des projections de l'indice SPI sur les années à venir.
+
+
+
+

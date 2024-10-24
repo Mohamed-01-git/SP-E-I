@@ -1,0 +1,131 @@
+---
+title: "DATA CITIES"
+author: "Afaf ALOUI & Mohamed EL-BADRI"
+date: "2024-08-13"
+output: html_document
+---
+
+```{r}
+library(ncdf4)
+library(SPEI)
+library(tidyverse)
+library(readODS)
+# library(raster)
+setwd("~/SI")
+# Define city coordinates
+cities <- data.frame(
+  city = c("Casablanca", "Rabat", "Marrakech", "Tangier", "Agadir", "Fes", 
+           "Oujda", "Meknes", "Laayoune", "Dakhla", "Nador", "Tetouan", 
+           "Essaouira", "Al Hoceima", "Kenitra", "Beni Mellal", "Khouribga", 
+           "Safi", "El Jadida", "Taza", "Ifrane", "Ouarzazate", "Chefchaouen", 
+           "Errachidia", "Mohammedia", "Settat", "Sidi Kacem", "Guelmim", 
+           "Taroudant"),
+  lat = c(33.5731, 34.0209, 31.6295, 35.7595, 30.4278, 34.0181, 34.6823, 33.8965, 
+          27.1253, 23.6847, 35.1688, 35.5785, 31.5085, 35.2471, 34.2610, 32.3397, 
+          32.8805, 32.2994, 33.2311, 34.2097, 33.5333, 30.9189, 35.1715, 31.9314, 
+          33.6841, 33.0011, 34.2247, 28.9880, 30.4708),
+  lon = c(-7.5898, -6.8417, -7.9811, -5.8340, -9.5981, -4.9998, -1.9006, -5.5473, 
+          -13.1625, -15.9579, -2.9335, -5.3684, -9.7595, -3.9315, -6.5708, -6.3498, 
+          -6.9066, -9.2372, -8.5007, -3.9986, -5.1167, -6.8931, -5.2632, -4.4243, 
+          -7.3827, -7.6166, -5.7074, -10.0572, -8.8769)
+)
+
+# Initialize a list to store data frames
+data_list <- list()
+
+# Open the NetCDF file to get lon and lat only once
+MOROCCO_NC <- "~/SI/DATA/RR_MOROCCO_8.5.nc"
+INFILE <- nc_open(MOROCCO_NC)
+LON <- ncvar_get(INFILE, "lon")
+LAT <- ncvar_get(INFILE, "lat")
+nc_close(INFILE)
+
+# Function to find the nearest grid point
+nearest_grid_point <- function(lon, lat, LON, LAT) {
+  dist = sqrt((LON - lon)^2 + (LAT - lat)^2)
+  ind = which(dist == min(dist), arr.ind = TRUE)
+  return(ind)
+}
+
+# Loop through each city and extract data
+for (city in 1:nrow(cities)) {
+  # coords <- nearest_grid_point(cities$lon[city], cities$lat[city], LON, LAT)
+  # i <- coords[1]
+  # j <- coords[2]
+  
+  i <- which.min(abs(cities$lon[city] - LON[,1]))
+  j <- which.min(abs(cities$lat[city] - LAT[1,]))
+  
+  # Open the NetCDF files for each variable
+  TMOY_NC <- "~/SI/DATA/TMOY_MOROCCO_8.5.nc"
+  TMIN_NC <- "~/SI/DATA/TMIN_MOROCCO_8.5.nc"
+  RR_NC <- "~/SI/DATA/RR_MOROCCO_8.5.nc"
+  TMAX_NC <- "~/SI/DATA/TMAX_MOROCCO_8.5.nc"
+
+  INFILE <- nc_open(TMIN_NC)
+  TMIN <- ncvar_get(INFILE, "tasmin", start = c(i, j, 1), count = c(1, 1, -1))
+  nc_close(INFILE)
+  
+  INFILE <- nc_open(RR_NC)
+  RR <- ncvar_get(INFILE, "pr", start = c(i, j, 1), count = c(1, 1, -1))
+  nc_close(INFILE)
+  
+  INFILE <- nc_open(TMAX_NC)
+  TMAX <- ncvar_get(INFILE, "tasmax", start = c(i, j, 1), count = c(1, 1, -1))
+  TIME=ncvar_get(INFILE,"time")
+  TIME=as.Date(TIME,origin="1949-12-01")
+  nc_close(INFILE)
+  
+  INFILE <- nc_open(TMOY_NC)
+  TMOY <- ncvar_get(INFILE, "tas", start = c(i, j, 1), count = c(1, 1, -1))
+  nc_close(INFILE)
+  
+  RR <- RR * 86400 * 30  # Convert RR to mm/day
+  TMIN <- TMIN - 273.15
+  TMAX <- TMAX - 273.15
+  TMOY <- TMOY - 273.15
+  
+  # Calculate SPI and SPEI
+  SPI_1 <- spi(RR, scale = 1)
+  SPI_3 <- spi(RR, scale = 3)
+  SPI_6 <- spi(RR, scale = 6)
+  SPI_9 <- spi(RR, scale = 9)
+  SPI_12 <- spi(RR, scale = 12)
+  
+  PET <- hargreaves(Tmin = as.vector(TMIN), Tmax = as.vector(TMAX), lat = cities$lat[city])
+  
+  BAL = RR - PET
+  SPEI_1 <- spei(BAL, scale = 1)
+  SPEI_3 <- spei(BAL, scale = 3)
+  SPEI_6 <- spei(BAL, scale = 6)
+  SPEI_9 <- spei(BAL, scale = 9)
+  SPEI_12 <- spei(BAL, scale = 12)
+  
+  # Create a data frame for each city
+  df <- data.frame(
+    TIME=TIME,
+    RR = RR,
+    TMAX = TMAX,
+    TMIN = TMIN,
+    TMOY = TMOY,
+    SPI_1 = SPI_1$fitted,
+    SPI_3 = SPI_3$fitted,
+    SPI_6 = SPI_6$fitted,
+    SPI_9 = SPI_9$fitted,
+    SPI_12 = SPI_12$fitted,
+    SPEI_1 = SPEI_1$fitted,
+    SPEI_3 = SPEI_3$fitted,
+    SPEI_6 = SPEI_6$fitted,
+    SPEI_9 = SPEI_9$fitted,
+    SPEI_12 = SPEI_12$fitted
+  )
+  
+  # Add the city's data to the list
+  data_list[[cities$city[city]]] <- df
+}
+
+# Write each city's data to a separate sheet in an ODS file
+write_ods(data_list, path = "CITIES_8.5.ods")
+
+```
+

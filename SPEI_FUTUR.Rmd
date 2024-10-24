@@ -1,0 +1,153 @@
+---
+title: "SPEI_2021-2100"
+output: html_document
+date: "2024-08-13"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(ncdf4)
+library(magrittr)
+library(SPEI)
+library(dplyr)
+library(readODS)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+setwd("~/SI")
+```
+
+
+
+```{r}
+# Define the NetCDF file path
+setwd("~/SI")
+MOROCCO_NC <- "DATA/RR_MOROCCO_8.5.nc"
+
+# Open the NetCDF file to get lon and lat only once
+INFILE <- nc_open(MOROCCO_NC)
+LON <- ncvar_get(INFILE, "lon")
+LAT <- ncvar_get(INFILE, "lat")
+nc_close(INFILE)
+
+# Extract latitude and longitude
+N <- LON[,1]
+L <- LAT[2,]
+
+# Initialize a list to store data frames
+data_list <- list()
+
+# Loop through each (x, y) point and save the time series to the list
+for (i in 1:40) {
+  for (j in 1:41) {
+    
+    TMOY_NC <- "DATA/TMOY_MOROCCO_8.5.nc"
+    TMIN_NC <- "DATA/TMIN_MOROCCO_8.5.nc"
+    RR_NC <- "DATA/RR_MOROCCO_8.5.nc"
+    TMAX_NC <- "DATA/TMAX_MOROCCO_8.5.nc"
+
+    INFILE <- nc_open(TMIN_NC)
+    TMIN <- ncvar_get(INFILE, "tasmin", start = c(i, j, 1), count = c(1, 1, -1))
+    nc_close(INFILE)
+    
+    INFILE <- nc_open(RR_NC)
+    RR <- ncvar_get(INFILE, "pr", start = c(i, j, 1), count = c(1, 1, -1))
+    nc_close(INFILE)
+    
+    INFILE <- nc_open(TMAX_NC)
+    TMAX <- ncvar_get(INFILE, "tasmax", start = c(i, j, 1), count = c(1, 1, -1))
+    TIME=ncvar_get(INFILE,"time")
+    TIME=as.Date(TIME,origin="1949-12-01")
+    nc_close(INFILE)
+    
+    INFILE <- nc_open(TMOY_NC)
+    TMOY <- ncvar_get(INFILE, "tas", start = c(i, j, 1), count = c(1, 1, -1))
+    nc_close(INFILE)
+    
+    RR=RR*86400*30     # convert RR to mm/day
+    TMIN=TMIN-273.15
+    TMAX=TMAX-273.15
+    TMOY=TMOY-273.15
+    
+    SPI_1=spi(RR,scale=1)
+    SPI_3=spi(RR,scale=3)
+    SPI_6=spi(RR,scale=6)
+    SPI_9=spi(RR,scale=9)
+    SPI_12=spi(RR,scale=12)
+    
+    PET=hargreaves(Tmin = as.vector(TMIN), Tmax = as.vector(TMAX), lat = L[j], Pre = as.vector(RR),na.rm = TRUE)
+    DD=RR-as.vector(PET)
+    
+    SPEI_1=spei(DD,scale=1)
+    SPEI_3=spei(DD,scale=3)
+    SPEI_6=spei(DD,scale=6)
+    SPEI_9=spei(DD,scale=9)
+    SPEI_12=spei(DD,scale=12)
+    
+    
+    DF <- data.frame(as.character(TIME),RR = RR,TMAX=TMAX,TMIN=TMIN,TMOY=TMOY,LON=N[i],LAT=L[j],SPI_1$fitted,SPI_3$fitted,SPI_6$fitted,SPI_9$fitted,SPI_12$fitted,SPEI_1$fitted,SPEI_3$fitted,SPEI_6$fitted,SPEI_9$fitted,SPEI_12$fitted)
+    colnames(DF) <- c("TIME","RR","TMAX","TMIN","TMOY","LON","LAT","SPI.1","SPI.3","SPI.6","SPI.9","SPI.12","SPEI.1","SPEI.3","SPEI.6","SPEI.9","SPEI.12")
+    
+    # Add the data frame to the list with a sheet name
+    sheet_name <- paste0("LON_", round(N[i], 2), "_LAT_", round(L[j], 2))
+    data_list[[sheet_name]] <- DF
+  }
+}
+
+# Define the output ODS file name
+output_file <- "DATA_MOROCCO_8.5.ods"
+
+# Write the list of data frames to an ODS file with separate sheets
+write_ods(data_list, output_file)
+
+```
+
+
+```{r}
+years <- c(2021:2100)
+row_index <- 12
+i=1
+# Loop over each ODS file to process data
+  file_path <-"~/SI/DATA_MOROCCO_8.5.ods"
+  all_data=list()
+  
+  # Read all sheets into a list
+  # sheet_names <- ods_sheets(file_path)
+  sheet_names=names(data_list)
+  # all_sheets <- lapply(sheet_names, function(sheet) read_ods(file_path, sheet = sheet, col_names = TRUE))
+  
+  # Loop over each year to process data
+  
+  for (year in years) {
+    # Pre-allocate data frame
+    DF <- data.frame(matrix(NA, ncol = 17, nrow = length(sheet_names)))
+    
+    # Populate data frame
+    for (j in seq_along(data_list)) {
+      FILE <- data_list[[j]]
+      DF[j, 1:17] <- FILE[row_index, ]
+    }
+    
+    # Set column names
+    colnames(DF) <- c("TIME","RR","TMAX","TMIN","TMOY","LON","LAT","SPI.1","SPI.3","SPI.6","SPI.9","SPI.12","SPEI.1","SPEI.3","SPEI.6","SPEI.9","SPEI.12")
+    
+    # Add data frame to list with a name based on the year
+    all_data[[i]] <- DF
+    i=i+1
+    # Write the list of data frames to a new ODS file
+
+    
+    # Update the row index (if needed, you can adjust this logic)
+    row_index <- ifelse(row_index < 948, row_index + 12, row_index)
+  }
+    output_file_path <- paste0("~/SI/FINAL_8.5.ods")
+    write_ods(all_data, output_file_path, col_names = TRUE)
+```
+

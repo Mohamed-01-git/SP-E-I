@@ -1,0 +1,311 @@
+---
+title: "Justification of the Number of Clusters for K-Means Clustering"
+author: "Afaf ALOUI & Mohamed EL-BADRI"
+date: "2024-08-13"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# I- READ THE REQUIRED PACKAGES.
+```{r}
+library(magrittr)
+library(dplyr)
+library(readODS)
+library(pracma)
+library(sf)
+library(ggplot2)
+library(factoextra)  # for cluster visualization and the Silhouette method
+library(purrr)
+library(cluster)     # for silhouette analysis
+```
+
+# II- REANALYSIS DATA
+```{r}
+setwd("~/SI")
+set.seed(123)
+```
+
+```{r}
+# Load data
+DATA_1.1 <- read_ods("SPEI_12_REA.ods", col_names = TRUE,row_names = TRUE,as_tibble = FALSE)
+# #rownames(DATA_1.1) <- as.character(DATA_1.1$TIME)
+# DATA_1.1 %<>% select(-TIME)
+print(head(DATA_1.1))
+
+```
+# YEARS
+
+```{r}
+# Function to calculate within-cluster sum of squares (WSS)
+wss <- function(k) {
+  kmeans(DATA_1.1, centers = k, nstart = 10)$tot.withinss
+}
+
+# Determine the optimal number of clusters using the Silhouette method
+fviz_nbclust(DATA_1.1, kmeans, method = "silhouette") +
+  labs(title = "Silhouette Method for Optimal Number of Clusters", x = "Number of Clusters", y = "Silhouette Width")
+```
+
+```{r}
+# Determine the optimal number of clusters using the Silhouette method
+fviz_result <- fviz_nbclust(DATA_1.1, kmeans, method = "silhouette")
+
+# Find the optimal number of clusters
+optimal_k <- fviz_result$data %>%
+  filter(y == max(y)) %>%    # Filter to find the maximum silhouette width
+  pull(clusters)             # Extract the corresponding number of clusters
+
+cat("Optimal number of clusters (k) is: ", optimal_k, "\n")
+
+# Apply K-means clustering using the optimal number of clusters
+kmeans_resultats_1.1 <- kmeans(DATA_1.1, centers = as.numeric(optimal_k), nstart = 10)
+```
+# ZONES
+
+```{r}
+# Function to calculate within-cluster sum of squares (WSS)
+wss <- function(k) {
+  kmeans(t(DATA_1.1), centers = k, nstart = 10)$tot.withinss
+}
+
+# Determine the optimal number of clusters using the Silhouette method
+fviz_nbclust(t(DATA_1.1), kmeans, method = "silhouette") +
+  labs(title = "Silhouette Method for Optimal Number of Clusters", x = "Number of Clusters", y = "Silhouette Width")
+```
+
+```{r}
+# Determine the optimal number of clusters using the Silhouette method
+fviz_result <- fviz_nbclust(t(DATA_1.1), kmeans, method = "silhouette")
+
+# Find the optimal number of clusters
+optimal_k <- fviz_result$data %>%
+  filter(y == max(y)) %>%    # Filter to find the maximum silhouette width
+  pull(clusters)             # Extract the corresponding number of clusters
+
+cat("Optimal number of clusters (k) is: ", optimal_k, "\n")
+
+# Apply K-means clustering using the optimal number of clusters
+kmeans_resultats_1.1 <- kmeans(t(DATA_1.1), centers = as.numeric(optimal_k), nstart = 10)
+```
+
+# III- PROJECTION 2.6
+
+```{r}
+setwd("~/SI")
+set.seed(123)
+```
+
+```{r}
+# Load data
+DATA_1.2 <- read_ods("SPEI_12_2.6.ods", col_names = TRUE,row_names = TRUE,as_tibble = FALSE)
+#rownames(DATA_1.2) <- as.character(DATA_1.2$TIME)
+# DATA_1.2 %<>% select(-TIME)
+print(head(DATA_1.2))
+DATA_1.2 %<>% apply(2,as.numeric) %<>%  as.data.frame()
+# DATA_1.2=DATA_1.2[! is.infinite(DATA_1.2),]
+
+DATA_1.2 %<>% 
+    filter_all(all_vars(!is.infinite(.)))
+```
+
+
+```{r}
+# Function to calculate within-cluster sum of squares (WSS)
+wss <- function(k) {
+  kmeans(DATA_1.2, centers = k, nstart = 10)$tot.withinss
+}
+
+# Determine the optimal number of clusters using the Silhouette method
+fviz_nbclust(DATA_1.2, kmeans, method = "silhouette") +
+  labs(title = "Silhouette Method for Optimal Number of Clusters", x = "Number of Clusters", y = "Silhouette Width")
+```
+
+
+
+
+#IV- PROJECTION 8.5.
+```{r}
+setwd("~/SI")
+set.seed(123)
+```
+
+```{r}
+# Load data
+DATA_1.3 <- read_ods("SPI_12_8.5.ods", col_names = TRUE,row_names = TRUE,as_tibble = FALSE)
+#rownames(DATA_1.3) <- as.character(DATA_1.3$TIME)
+# DATA_1.3 %<>% select(-TIME)
+print(head(DATA_1.3))
+
+```
+
+```{r}
+# Function to calculate within-cluster sum of squares (WSS)
+wss <- function(k) {
+  kmeans(DATA_1.3, centers = k, nstart = 10)$tot.withinss
+}
+
+# Determine the optimal number of clusters using the Silhouette method
+fviz_nbclust(DATA_1.3, kmeans, method = "silhouette") +
+  labs(title = "Silhouette Method for Optimal Number of Clusters", x = "Number of Clusters", y = "Silhouette Width")
+```
+
+```{r}
+# Determine the optimal number of clusters using the Silhouette method
+fviz_result <- fviz_nbclust(DATA_1.3, kmeans, method = "silhouette")
+
+# Find the optimal number of clusters
+optimal_k <- fviz_result$data %>%
+  filter(y == max(y)) %>%    # Filter to find the maximum silhouette width
+  pull(clusters)             # Extract the corresponding number of clusters
+
+cat("Optimal number of clusters (k) is: ", optimal_k, "\n")
+
+# Apply K-means clustering using the optimal number of clusters
+kmeans_resultats_1.3 <- kmeans(DATA_1.3, centers = as.numeric(optimal_k), nstart = 10)
+```
+
+
+II- FOR CITIES
+
+
+
+
+# I- READ THE REQUIRED PACKAGES.
+```{r}
+library(magrittr)
+library(dplyr)
+library(readODS)
+library(pracma)
+library(sf)
+library(ggplot2)
+library(factoextra)  # for cluster visualization and the Silhouette method
+library(purrr)
+library(cluster)     # for silhouette analysis
+```
+
+# II- REANALYSIS DATA
+```{r}
+setwd("~/SI")
+set.seed(123)
+```
+
+```{r}
+# Load data
+DATA_1.1 <- read_ods("SPEI_12_REA.ods", col_names = TRUE,row_names = TRUE,as_tibble = FALSE)
+#rownames(DATA_1.1) <- as.character(DATA_1.1$TIME)
+# DATA_1.1 %<>% select(-TIME)
+DATA_1.1=t(DATA_1.1)
+print(head(DATA_1.1))
+
+```
+
+```{r}
+# Function to calculate within-cluster sum of squares (WSS)
+wss <- function(k) {
+  kmeans(DATA_1.1, centers = k, nstart = 10)$tot.withinss
+}
+
+# Determine the optimal number of clusters using the Silhouette method
+fviz_nbclust(DATA_1.1, kmeans, method = "silhouette") +
+  labs(title = "Silhouette Method for Optimal Number of Clusters", x = "Number of Clusters", y = "Silhouette Width")
+```
+
+```{r}
+# Determine the optimal number of clusters using the Silhouette method
+fviz_result <- fviz_nbclust(DATA_1.1, kmeans, method = "silhouette")
+
+# Find the optimal number of clusters
+optimal_k <- fviz_result$data %>%
+  filter(y == max(y)) %>%    # Filter to find the maximum silhouette width
+  pull(clusters)             # Extract the corresponding number of clusters
+
+cat("Optimal number of clusters (k) is: ", optimal_k, "\n")
+
+# Apply K-means clustering using the optimal number of clusters
+kmeans_resultats_1.1 <- kmeans(DATA_1.1, centers = as.numeric(optimal_k), nstart = 10)
+```
+
+# III- PROJECTION 2.6
+
+```{r}
+setwd("~/SI")
+set.seed(123)
+```
+
+```{r}
+# Load data
+DATA_1.2 <- read_ods("SPEI_12_2.6.ods", col_names = TRUE,row_names = TRUE,as_tibble = FALSE)
+#rownames(DATA_1.2) <- as.character(DATA_1.2$TIME)
+# DATA_1.2 %<>% select(-TIME)
+
+DATA_1.2 %<>% apply(2,as.numeric) %<>%  as.data.frame()
+# DATA_1.2=DATA_1.2[! is.infinite(DATA_1.2),]
+
+DATA_1.2 %<>% 
+    filter_all(all_vars(!is.infinite(.)))
+DATA_1.2 %<>% t()
+print(head(DATA_1.2))
+```
+
+
+```{r}
+# Function to calculate within-cluster sum of squares (WSS)
+wss <- function(k) {
+  kmeans(DATA_1.2, centers = k, nstart = 10)$tot.withinss
+}
+
+# Determine the optimal number of clusters using the Silhouette method
+fviz_nbclust(DATA_1.2, kmeans, method = "silhouette") +
+  labs(title = "Silhouette Method for Optimal Number of Clusters", x = "Number of Clusters", y = "Silhouette Width")
+```
+
+
+
+
+#IV- PROJECTION 8.5.
+```{r}
+setwd("~/SI")
+set.seed(123)
+```
+
+```{r}
+# Load data
+DATA_1.3 <- read_ods("SPI_12_8.5.ods", col_names = TRUE,row_names = TRUE,as_tibble = FALSE)
+#rownames(DATA_1.3) <- as.character(DATA_1.3$TIME)
+# DATA_1.3 %<>% select(-TIME)
+print(head(DATA_1.3))
+DATA_1.3 %<>% t()
+```
+
+```{r}
+# Function to calculate within-cluster sum of squares (WSS)
+wss <- function(k) {
+  kmeans(DATA_1.3, centers = k, nstart = 10)$tot.withinss
+}
+
+# Determine the optimal number of clusters using the Silhouette method
+fviz_nbclust(DATA_1.3, kmeans, method = "silhouette") +
+  labs(title = "Silhouette Method for Optimal Number of Clusters", x = "Number of Clusters", y = "Silhouette Width")
+```
+
+```{r}
+# Determine the optimal number of clusters using the Silhouette method
+fviz_result <- fviz_nbclust(DATA_1.3, kmeans, method = "silhouette")
+
+# Find the optimal number of clusters
+optimal_k <- fviz_result$data %>%
+  filter(y == max(y)) %>%    # Filter to find the maximum silhouette width
+  pull(clusters)             # Extract the corresponding number of clusters
+
+cat("Optimal number of clusters (k) is: ", optimal_k, "\n")
+
+# Apply K-means clustering using the optimal number of clusters
+kmeans_resultats_1.3 <- kmeans(DATA_1.3, centers = as.numeric(optimal_k), nstart = 10)
+```
+
+
